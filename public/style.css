@@ -1,0 +1,57 @@
+.otp-form {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background: linear-gradient(135deg, #6b7c93, #3e4c6d);
+    font-family: 'Arial', sans-serif;
+    animation: fadeIn 1.5s;
+}
+
+.otp-container {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    width: 90%;
+    max-width: 400px;
+}
+
+h2 {
+    text-align: center;
+    color: #333;
+}
+
+.input-group {
+    margin: 15px 0;
+    display: flex;
+    justify-content: space-between;
+}
+
+.input-group input {
+    width: 30%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 16px;
+}
+
+.button {
+    background: #3e4c6d;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background 0.3s;
+}
+
+.button:hover {
+    background: #2a374a;
+}
+
+@keyframes fadeIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+}
