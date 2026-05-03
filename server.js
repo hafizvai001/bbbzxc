@@ -1,56 +1,75 @@
-// server.js
-
 const express = require('express');
-const twilio = require('twilio');
-const bodyParser = require('body-parser');
-const dotenv = require('dotenv');
-
-dotenv.config();
-
+const nodemailer = require('nodemailer');
+const rateLimit = require('express-rate-limit');
 const app = express();
-app.use(bodyParser.json());
 
-const accountSid = process.env.TWILIO_ACCOUNT_SID;
-const authToken = process.env.TWILIO_AUTH_TOKEN;
-const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
+app.use(express.json());
 
-const client = twilio(accountSid, authToken);
-const otps = {}; // In-memory store for OTPs
-
-// Endpoint to send OTP
-app.post('/send-otp', (req, res) => {
-    const { phoneNumber } = req.body;
-    const otp = Math.floor(100000 + Math.random() * 900000).toString(); // Generate 6 digit OTP
-
-    otps[phoneNumber] = otp;
-
-    client.messages
-        .create({
-            body: `Your OTP is ${otp}`,
-            from: twilioPhoneNumber,
-            to: phoneNumber,
-        })
-        .then(message => {
-            res.json({ success: true, message: 'OTP sent!', sid: message.sid });
-        })
-        .catch(err => {
-            res.status(500).json({ success: false, message: 'Error sending OTP', error: err.message });
-        });
+// Configure nodemailer transporter
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: 'your-email@gmail.com', // Your email
+        pass: 'your-email-password', // Your email password
+    },
 });
 
-// Endpoint to verify OTP
-app.post('/verify-otp', (req, res) => {
-    const { phoneNumber, otp } = req.body;
-    if (otps[phoneNumber] && otps[phoneNumber] === otp) {
-        delete otps[phoneNumber]; // Invalidate used OTP
-        res.json({ success: true, message: 'OTP verified successfully!' });
-    } else {
-        res.status(400).json({ success: false, message: 'Invalid OTP' });
+// Store OTPs and their expiry times
+let otps = {};
+const OTP_EXPIRY_TIME = 5 * 60 * 1000; // 5 minutes expiry
+
+// Rate limit to control OTP requests
+const limiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 5, // limit each IP to 5 requests per windowMs
+});
+
+// Generate and send OTP
+app.post('/generate-otp', limiter, async (req, res) => {
+    const { email } = req.body;
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString(); // Generate 6 digit OTP
+    const expiryTime = Date.now() + OTP_EXPIRY_TIME;
+
+    otps[email] = { otp, expiryTime };
+
+    const mailOptions = {
+        from: 'your-email@gmail.com',
+        to: email,
+        subject: 'Your OTP Code',
+        text: `Your OTP code is ${otp} and it is valid for 5 minutes.`,
+    };
+
+    try {
+        await transporter.sendMail(mailOptions);
+        return res.status(200).send('OTP sent to your email.');
+    } catch (error) {
+        return res.status(500).send('Error sending OTP.');
     }
 });
 
-// Start the server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+// Validate OTP
+app.post('/validate-otp', (req, res) => {
+    const { email, otp } = req.body;
+
+    const storedData = otps[email];
+    if (!storedData) return res.status(400).send('OTP not generated or expired.');
+
+    const { otp: storedOtp, expiryTime } = storedData;
+
+    if (Date.now() > expiryTime) {
+        delete otps[email];
+        return res.status(400).send('OTP expired.');
+    }
+
+    if (storedOtp !== otp) {
+        return res.status(400).send('Invalid OTP.');
+    }
+
+    delete otps[email]; // Remove OTP after successful validation
+    res.send('OTP validated successfully.');
+});
+
+app.listen(3000, () => {
+    console.log('Server running on port 3000');
 });
